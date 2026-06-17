@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>World Cup 2026 Challenge Tracker</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <h1>🏆 World Cup 2026 Challenge</h1>
+      <div class="status-bar">
+        <span id="phase-badge" class="badge">Loading…</span>
+        <span id="updated" class="updated"></span>
+        <button id="refresh" title="Refresh data">↻ Refresh</button>
+      </div>
+    </div>
+    <nav id="tabs">
+      <button data-tab="leaderboard" class="active">Leaderboard</button>
+      <button data-tab="owners">By Person</button>
+      <button data-tab="groups">Groups</button>
+      <button data-tab="fixtures">Fixtures</button>
+    </nav>
+  </header>
+
+  <main>
+    <div id="error" class="error hidden"></div>
+
+    <section id="leaderboard" class="tab active">
+      <p class="section-note">
+        Standing = <strong>winnings &minus; team cost</strong>. During the group stage nobody has earned a
+        payout yet, so everyone is down by their total buy-in. Payouts begin in the Round of 16.
+      </p>
+      <div id="leaderboard-body"></div>
+      <div id="value-panel"></div>
+    </section>
+
+    <section id="owners" class="tab">
+      <div id="owners-body" class="owner-grid"></div>
+    </section>
+
+    <section id="groups" class="tab">
+      <div id="groups-body" class="group-grid"></div>
+    </section>
+
+    <section id="fixtures" class="tab">
+      <div id="fixtures-body"></div>
+    </section>
+  </main>
+
+  <footer>
+    <span>Live data via ESPN · payouts per organizer's rules · cost = Silver Bulletin expected value</span>
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
