@@ -1,0 +1,8 @@
+/* Self-hosted (latin subset) — keeps Content-Security-Policy font-src 'self' */
+@font-face{font-family:'DM Mono';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/dm-mono-400.woff2') format('woff2');}
+@font-face{font-family:'DM Mono';font-style:normal;font-weight:500;font-display:swap;src:url('fonts/dm-mono-500.woff2') format('woff2');}
+@font-face{font-family:'Saira';font-style:normal;font-weight:400;font-display:swap;src:url('fonts/saira-400.woff2') format('woff2');}
+@font-face{font-family:'Saira';font-style:normal;font-weight:500;font-display:swap;src:url('fonts/saira-500.woff2') format('woff2');}
+@font-face{font-family:'Saira';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/saira-600.woff2') format('woff2');}
+@font-face{font-family:'Saira Condensed';font-style:normal;font-weight:600;font-display:swap;src:url('fonts/saira-condensed-600.woff2') format('woff2');}
+@font-face{font-family:'Saira Condensed';font-style:normal;font-weight:700;font-display:swap;src:url('fonts/saira-condensed-700.woff2') format('woff2');}
