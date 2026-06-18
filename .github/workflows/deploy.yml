@@ -1,0 +1,40 @@
+name: Deploy to GitHub Pages
+
+# Auto-deploys the static site whenever main changes (e.g. right after a PR merges).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Permissions the GitHub Pages deploy actions require
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deploy at a time; newer pushes supersede in-progress runs
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .            # the site is plain static files at the repo root
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
