@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#073154" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <!-- Defense-in-depth: no inline/remote scripts; only ESPN API for data, https images. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data:; connect-src https://site.api.espn.com; base-uri 'none'; form-action 'none'" />
   <title>World Cup 2026 Challenge Tracker</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -20,6 +25,7 @@
       <button data-tab="leaderboard" class="active">Leaderboard</button>
       <button data-tab="owners">By Person</button>
       <button data-tab="groups">Groups</button>
+      <button data-tab="scores">Scores</button>
       <button data-tab="fixtures">Fixtures</button>
     </nav>
   </header>
@@ -44,7 +50,13 @@
       <div id="groups-body" class="group-grid"></div>
     </section>
 
+    <section id="scores" class="tab">
+      <p class="section-note">Today's matches (top) back through the start of the tournament. Owned teams are highlighted.</p>
+      <div id="scores-body"></div>
+    </section>
+
     <section id="fixtures" class="tab">
+      <p class="section-note">Upcoming matches, next day first. Owned teams are highlighted.</p>
       <div id="fixtures-body"></div>
     </section>
   </main>

@@ -11,6 +11,12 @@ const money = (n) => (n < 0 ? "-$" : "$") + Math.abs(n).toFixed(2);
 const moneyClass = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "muted");
 const byCode = Object.fromEntries(TEAMS.map((t) => [t.code, t]));
 
+// HTML-escape any value before inserting into innerHTML (defends against XSS in third-party API data)
+const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC_MAP[c]);
+// Only allow http(s) image URLs; reject anything else (e.g. javascript:, data:text/html)
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u || "")) ? esc(u) : "");
+
 /* ---- round detection from ESPN season slug ---- */
 function roundOf(slug) {
   const s = (slug || "").toLowerCase();
@@ -46,11 +52,11 @@ async function loadAll() {
 /* ---- parse standings: group records + advancement notes ---- */
 function parseStandings(standings) {
   const groups = [];
-  const teamInfo = {}; // code -> {group, rank, w,d,l, pts, gd, gf, ga, record, note, name, logo}
+  const teamInfo = Object.create(null); // code -> {...}; null-proto avoids prototype pollution from API keys
   for (const g of standings.children || []) {
     const rows = [];
     for (const e of g.standings.entries) {
-      const stat = {};
+      const stat = Object.create(null);
       for (const s of e.stats) stat[s.type] = s;
       const code = e.team.abbreviation;
       const info = {
@@ -120,7 +126,7 @@ const ROUND_ORDER = { group: 0, r32: 1, r16: 2, qf: 3, sf: 4, third: 5, final: 5
 
 function computePayouts(matches) {
   // gather completed knockout matches per team
-  const played = {}; // code -> [{round, won}]
+  const played = Object.create(null); // code -> [{round, won}]; null-proto for API-keyed safety
   let finalPlayed = false, thirdPlayed = false;
   for (const m of matches) {
     if (m.round === "group" || !m.completed) continue;
@@ -266,7 +272,7 @@ function renderLeaderboard(owners) {
   const rows = owners.map((o, i) => `
     <tr class="lead-row">
       <td class="rank">${i + 1}</td>
-      <td><span class="owner-name"><span class="dot" style="background:${o.color}"></span>${o.name}</span></td>
+      <td><span class="owner-name"><span class="dot" style="background:${esc(o.color)}"></span>${esc(o.name)}</span></td>
       <td class="money neg">-${money(o.cost).replace("-", "")}</td>
       <td class="money ${o.earned > 0 ? "pos" : "muted"}">${money(o.earned)}</td>
       <td class="money ${moneyClass(o.net)}">${money(o.net)}</td>
@@ -300,12 +306,12 @@ function renderValue(value) {
     return `
       <li class="vp-row">
         <span class="team-name">
-          <span class="dot" style="background:${OWNER_COLORS[o ? o.owner : ""]}" title="${o ? OWNER_NAMES[o.owner] : ""}"></span>
-          ${t.logo ? `<img class="team-logo" src="${t.logo}" alt="">` : ""}
-          <b>${t.name}</b> <span class="team-code">${o ? o.owner : ""} · cost ${money(t.cost)}</span>
+          <span class="dot" style="background:${esc(OWNER_COLORS[o ? o.owner : ""])}" title="${o ? esc(OWNER_NAMES[o.owner]) : ""}"></span>
+          ${t.logo ? `<img class="team-logo" src="${safeUrl(t.logo)}" alt="">` : ""}
+          <b>${esc(t.name)}</b> <span class="team-code">${o ? esc(o.owner) : ""} · cost ${money(t.cost)}</span>
         </span>
         <span class="vp-meta">
-          <span class="vp-status">${status}</span>
+          <span class="vp-status">${esc(status)}</span>
           ${metric}
         </span>
       </li>`;
@@ -338,8 +344,8 @@ function teamStatusPill(t) {
     if (t.note && /advance/i.test(t.note.description || "")) return `<span class="pill adv">Advancing</span>`;
     return `<span class="pill">Group</span>`;
   }
-  if (t.alive) return `<span class="pill alive">${t.statusLabel}</span>`;
-  return `<span class="pill out">${t.statusLabel}</span>`;
+  if (t.alive) return `<span class="pill alive">${esc(t.statusLabel)}</span>`;
+  return `<span class="pill out">${esc(t.statusLabel)}</span>`;
 }
 
 function renderOwners(owners) {
@@ -348,16 +354,16 @@ function renderOwners(owners) {
     const lis = teams.map((t) => `
       <li>
         <span class="team-name">
-          ${t.logo ? `<img class="team-logo" src="${t.logo}" alt="">` : ""}
-          ${t.name} <span class="team-code">${t.group || ""}</span>
+          ${t.logo ? `<img class="team-logo" src="${safeUrl(t.logo)}" alt="">` : ""}
+          ${esc(t.name)} <span class="team-code">${esc(t.group || "")}</span>
         </span>
-        <span class="rec" title="Group record (W-D-L)">${t.record}</span>
+        <span class="rec" title="Group record (W-D-L)">${esc(t.record)}</span>
         <span class="team-pay">${teamStatusPill(t)}</span>
       </li>`).join("");
     return `
       <div class="owner-card">
         <header>
-          <h3><span class="dot" style="background:${o.color}"></span>${o.name}</h3>
+          <h3><span class="dot" style="background:${esc(o.color)}"></span>${esc(o.name)}</h3>
           <span class="owner-net ${moneyClass(o.net)}">${money(o.net)}</span>
         </header>
         <div class="owner-sub">
@@ -376,14 +382,14 @@ function renderGroups(groups) {
       const owner = byCode[t.code] ? byCode[t.code].owner : "";
       const qual = t.rank <= 2 ? "qual" : "";
       return `<tr class="${qual}">
-        <td class="tm">${t.code}<span class="owner-tag" style="color:${OWNER_COLORS[owner] || "var(--muted)"}">${owner}</span></td>
+        <td class="tm">${esc(t.code)}<span class="owner-tag" style="color:${esc(OWNER_COLORS[owner] || "var(--muted)")}">${esc(owner)}</span></td>
         <td>${t.gp}</td><td>${t.w}</td><td>${t.d}</td><td>${t.l}</td>
         <td>${t.gd > 0 ? "+" + t.gd : t.gd}</td><td><b>${t.pts}</b></td>
       </tr>`;
     }).join("");
     return `
       <div class="group-card">
-        <h3>${g.name}</h3>
+        <h3>${esc(g.name)}</h3>
         <table class="grp">
           <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -392,44 +398,81 @@ function renderGroups(groups) {
   }).join("");
 }
 
-function renderFixtures(matches) {
-  const fmtDay = (iso) => new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  const fmtTime = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  const days = {};
-  for (const m of matches) (days[fmtDay(m.date)] = days[fmtDay(m.date)] || []).push(m);
+/* local YYYY-MM-DD key for splitting/sorting by calendar day */
+const dayKey = (d) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
+};
+const todayKey = () => dayKey(new Date());
+const fmtDay = (iso) => new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+function matchCard(m) {
   const isOwned = (code) => !!byCode[code];
-  document.getElementById("fixtures-body").innerHTML = Object.entries(days).map(([day, ms]) => {
-    const rows = ms.map((m) => {
-      const owned = isOwned(m.home.code) || isOwned(m.away.code) ? "owned" : "";
-      const stateCls = m.state === "in" ? "live" : "";
-      const scoreTxt = m.state === "pre" ? "v" : `${m.home.score ?? ""} – ${m.away.score ?? ""}`;
-      const stateTxt = m.state === "pre" ? `${fmtTime(m.date)} · ${m.roundLabel}` : `${m.detail} · ${m.roundLabel}`;
-      const hc = m.completed ? (m.home.winner ? "win" : "loss") : "";
-      const ac = m.completed ? (m.away.winner ? "win" : "loss") : "";
-      return `
-        <div class="match ${owned}">
-          <div class="side home ${hc}">
-            ${tag(m.home.code)} ${m.home.logo ? `<img class="team-logo" src="${m.home.logo}" alt="">` : ""}
-            <span>${m.home.name}</span>
-          </div>
-          <div>
-            <div class="score">${scoreTxt}</div>
-            <div class="state ${stateCls}">${stateTxt}</div>
-          </div>
-          <div class="side away ${ac}">
-            <span>${m.away.name}</span>
-            ${m.away.logo ? `<img class="team-logo" src="${m.away.logo}" alt="">` : ""} ${tag(m.away.code)}
-          </div>
-        </div>`;
-    }).join("");
-    return `<div class="day-group"><h4 class="day-head">${day}</h4>${rows}</div>`;
-  }).join("");
+  const owned = isOwned(m.home.code) || isOwned(m.away.code) ? "owned" : "";
+  const stateCls = m.state === "in" ? "live" : "";
+  const scoreTxt = m.state === "pre" ? "v" : `${esc(m.home.score ?? "")} – ${esc(m.away.score ?? "")}`;
+  const stateTxt = m.state === "pre" ? `${esc(fmtTime(m.date))} · ${esc(m.roundLabel)}` : `${esc(m.detail)} · ${esc(m.roundLabel)}`;
+  const hc = m.completed ? (m.home.winner ? "win" : "loss") : "";
+  const ac = m.completed ? (m.away.winner ? "win" : "loss") : "";
+  return `
+    <div class="match ${owned}">
+      <div class="side home ${hc}">
+        ${tag(m.home.code)} ${m.home.logo ? `<img class="team-logo" src="${safeUrl(m.home.logo)}" alt="">` : ""}
+        <span>${esc(m.home.name)}</span>
+      </div>
+      <div>
+        <div class="score">${scoreTxt}</div>
+        <div class="state ${stateCls}">${stateTxt}</div>
+      </div>
+      <div class="side away ${ac}">
+        <span>${esc(m.away.name)}</span>
+        ${m.away.logo ? `<img class="team-logo" src="${safeUrl(m.away.logo)}" alt="">` : ""} ${tag(m.away.code)}
+      </div>
+    </div>`;
 }
+
+/* group ascending-sorted matches by calendar day; returns [{key,label,items}] in ascending day order */
+function groupByDay(matches) {
+  const today = todayKey();
+  const groups = new Map();
+  for (const m of matches) {
+    const k = dayKey(m.date);
+    if (!groups.has(k)) {
+      const label = k === today ? `Today · ${fmtDay(m.date)}` : fmtDay(m.date);
+      groups.set(k, { key: k, label, items: [] });
+    }
+    groups.get(k).items.push(m);
+  }
+  return [...groups.values()];
+}
+
+function renderDayGroups(elId, groups, emptyMsg) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  el.innerHTML = groups.length
+    ? groups.map((g) => `<div class="day-group"><h4 class="day-head">${g.label}</h4>${g.items.map(matchCard).join("")}</div>`).join("")
+    : `<p class="section-note">${emptyMsg}</p>`;
+}
+
+/* Fixtures: upcoming only — tomorrow onward, soonest day first */
+function renderFixtures(matches) {
+  const today = todayKey();
+  const upcoming = matches.filter((m) => dayKey(m.date) > today);
+  renderDayGroups("fixtures-body", groupByDay(upcoming), "No upcoming fixtures — that's the end of the schedule. 🏆");
+}
+
+/* Scores: today (even if not started) + every prior day back to the opener, newest day first */
+function renderScores(matches) {
+  const today = todayKey();
+  const played = matches.filter((m) => dayKey(m.date) <= today);
+  renderDayGroups("scores-body", groupByDay(played).reverse(), "No matches yet — the tournament hasn't kicked off.");
+}
+
 function tag(code) {
   const o = byCode[code];
   if (!o) return "";
-  return `<span class="dot" style="background:${OWNER_COLORS[o.owner]}" title="${OWNER_NAMES[o.owner]}"></span>`;
+  return `<span class="owner-chip" style="background:${esc(OWNER_COLORS[o.owner])}" title="Owner: ${esc(OWNER_NAMES[o.owner])}">${esc(o.owner)}</span>`;
 }
 
 /* ====================== BOOT ====================== */
@@ -440,6 +483,7 @@ function renderAll() {
   renderValue(cache.value);
   renderOwners(cache.ownerList);
   renderGroups(cache.groups);
+  renderScores(cache.matches);
   renderFixtures(cache.matches);
 }
 
@@ -473,7 +517,7 @@ async function refresh() {
 
 // tab switching (deep-linkable via #hash)
 function activateTab(name) {
-  const valid = ["leaderboard", "owners", "groups", "fixtures"];
+  const valid = ["leaderboard", "owners", "groups", "scores", "fixtures"];
   if (!valid.includes(name)) name = "leaderboard";
   document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("active", s.id === name));
