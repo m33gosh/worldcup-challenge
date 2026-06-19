@@ -5,7 +5,11 @@
 
 const ESPN = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world";
 const STANDINGS = "https://site.api.espn.com/apis/v2/sports/soccer/fifa.world/standings";
-const SEASON_RANGE = "20260611-20260719"; // tournament window
+// Two windows: ESPN's scoreboard caps at 100 events, and the full tournament is 104
+// matches (72 group + 32 knockout). Splitting at the group/knockout boundary keeps
+// every match — including the SF/3rd/Final the single-window query used to drop.
+const GROUP_RANGE = "20260611-20260627";
+const KO_RANGE = "20260628-20260719";
 
 const money = (n) => (n < 0 ? "-$" : "$") + Math.abs(n).toFixed(2);
 const moneyClass = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "muted");
@@ -42,10 +46,15 @@ async function getJSON(url) {
 }
 
 async function loadAll() {
-  const [standings, scoreboard] = await Promise.all([
+  const [standings, sbGroup, sbKO] = await Promise.all([
     getJSON(STANDINGS),
-    getJSON(`${ESPN}/scoreboard?dates=${SEASON_RANGE}`),
+    getJSON(`${ESPN}/scoreboard?dates=${GROUP_RANGE}`),
+    getJSON(`${ESPN}/scoreboard?dates=${KO_RANGE}`),
   ]);
+  // merge events from both windows, de-duped by id (ranges don't overlap, but be safe)
+  const byId = new Map();
+  for (const e of [...(sbGroup.events || []), ...(sbKO.events || [])]) byId.set(e.id, e);
+  const scoreboard = { ...sbGroup, events: [...byId.values()] };
   return { standings, scoreboard };
 }
 
@@ -416,6 +425,135 @@ function renderGroups(groups) {
   }).join("");
 }
 
+/* ====================== BRACKET ======================
+ * WC2026 knockout topology, verified against ESPN's scheduled fixtures
+ * (event ids + slot linkages). The tree never changes; teams fill in live as
+ * the draw resolves. `feeders` are [top, bottom] for vertical layout — each
+ * node draws between its two feeders, so the column order is implied by the tree.
+ * A slot is "resolved" once its ESPN abbreviation matches a roster team (byCode);
+ * all 48 qualified teams are exactly our roster, so that test is exhaustive.
+ */
+const KO_TREE = {
+  final: { id: "760517", feeders: ["sf1", "sf2"] },
+  sf1: { id: "760514", feeders: ["qf1", "qf2"] },
+  sf2: { id: "760515", feeders: ["qf3", "qf4"] },
+  qf1: { id: "760510", feeders: ["r16_1", "r16_2"] },
+  qf2: { id: "760511", feeders: ["r16_5", "r16_6"] },
+  qf3: { id: "760512", feeders: ["r16_3", "r16_4"] },
+  qf4: { id: "760513", feeders: ["r16_7", "r16_8"] },
+  r16_1: { id: "760502", feeders: ["r32_1", "r32_3"] },
+  r16_2: { id: "760503", feeders: ["r32_2", "r32_5"] },
+  r16_3: { id: "760504", feeders: ["r32_4", "r32_6"] },
+  r16_4: { id: "760505", feeders: ["r32_7", "r32_8"] },
+  r16_5: { id: "760506", feeders: ["r32_11", "r32_12"] },
+  r16_6: { id: "760507", feeders: ["r32_9", "r32_10"] },
+  r16_7: { id: "760508", feeders: ["r32_13", "r32_15"] },
+  r16_8: { id: "760509", feeders: ["r32_14", "r32_16"] },
+  r32_1: { id: "760486" }, r32_2: { id: "760487" }, r32_3: { id: "760489" }, r32_4: { id: "760488" },
+  r32_5: { id: "760490" }, r32_6: { id: "760492" }, r32_7: { id: "760491" }, r32_8: { id: "760495" },
+  r32_9: { id: "760493" }, r32_10: { id: "760494" }, r32_11: { id: "760497" }, r32_12: { id: "760496" },
+  r32_13: { id: "760498" }, r32_14: { id: "760499" }, r32_15: { id: "760500" }, r32_16: { id: "760501" },
+};
+const THIRD_ID = "760516"; // 3rd-place match, shown on its own (not part of the tree)
+
+// a roster team occupies this slot? (vs an unresolved placeholder like "2A" / "RD32")
+const isResolved = (code) => !!byCode[code];
+
+// turn ESPN's placeholder name into something tidy for an empty slot
+function slotLabel(name) {
+  return String(name || "TBD")
+    .replace(/Round of 32 (\d+) Winner/i, "R32 #$1 winner")
+    .replace(/Round of 16 (\d+) Winner/i, "R16 #$1 winner")
+    .replace(/Quarterfinal (\d+) Winner/i, "QF$1 winner")
+    .replace(/Semifinal (\d+) Winner/i, "SF$1 winner")
+    .replace(/Semifinal (\d+) Loser/i, "SF$1 loser")
+    .replace(/Third Place Group /i, "3rd: ")
+    .replace(/Group ([A-L]) 2nd Place/i, "Group $1 runner-up")
+    .replace(/Group ([A-L]) Winner/i, "Group $1 winner");
+}
+
+function buildBracketNode(key, byEventId) {
+  const def = KO_TREE[key];
+  const node = { key, match: byEventId.get(def.id) || null };
+  if (def.feeders) node.feeders = def.feeders.map((f) => buildBracketNode(f, byEventId));
+  return node;
+}
+
+function bktSideRow(s, m) {
+  if (!s) return `<div class="bkt-side tbd"><span class="bkt-team">TBD</span></div>`;
+  const resolved = isResolved(s.code);
+  const result = m.completed ? (s.winner ? "win" : "loss") : "";
+  const chip = resolved ? tag(s.code) : "";
+  const label = resolved ? esc(s.name) : esc(slotLabel(s.name));
+  const score = m.state !== "pre" && s.score != null ? `<span class="bkt-score">${esc(s.score)}</span>` : "";
+  return `<div class="bkt-side ${result} ${resolved ? "" : "tbd"}">${chip}<span class="bkt-team">${label}</span>${score}</div>`;
+}
+
+function bktMatchCard(m) {
+  if (!m) return `<div class="bkt-match empty"><span class="bkt-team">TBD</span></div>`;
+  const live = m.state === "in";
+  const meta = m.state === "pre"
+    ? `${esc(fmtDay(m.date))} · ${esc(fmtTime(m.date))}`
+    : live ? `<span class="live-badge">LIVE</span>${esc(m.detail)}` : esc(m.detail || "Final");
+  const owned = isResolved(m.home.code) || isResolved(m.away.code) ? "owned" : "";
+  return `<div class="bkt-match ${owned} ${live ? "live" : ""}">
+      <div class="bkt-meta">${meta}</div>
+      ${bktSideRow(m.home, m)}
+      ${bktSideRow(m.away, m)}
+    </div>`;
+}
+
+function bktNodeHTML(node) {
+  const card = bktMatchCard(node.match);
+  if (!node.feeders) return `<div class="bkt-item leaf">${card}</div>`;
+  const [top, bot] = node.feeders;
+  return `<div class="bkt-item">
+      <div class="bkt-children">
+        <div class="bkt-branch top">${bktNodeHTML(top)}</div>
+        <div class="bkt-branch bot">${bktNodeHTML(bot)}</div>
+      </div>
+      <div class="bkt-mid">${card}</div>
+    </div>`;
+}
+
+function renderChampion(byEventId) {
+  const el = document.getElementById("champion-banner");
+  if (!el) return;
+  const finalM = byEventId.get(KO_TREE.final.id);
+  const champ = finalM && finalM.completed
+    ? [finalM.home, finalM.away].find((s) => s.winner && isResolved(s.code)) : null;
+  if (!champ) { el.innerHTML = ""; return; }
+  const o = byCode[champ.code];
+  el.innerHTML = `<div class="champion">
+      <span class="champion-crown">🏆</span>
+      <div class="champion-text">
+        <span class="eyebrow">World Champions</span>
+        <b>${esc(champ.name)}</b>
+      </div>
+      ${o ? `<span class="champion-owner"><span class="dot" style="background:${esc(OWNER_COLORS[o.owner])}"></span>${esc(OWNER_NAMES[o.owner])}</span>` : ""}
+    </div>`;
+}
+
+function renderBracket(matches) {
+  const el = document.getElementById("bracket-body");
+  if (!el) return;
+  const byEventId = new Map(matches.map((m) => [m.id, m]));
+  renderChampion(byEventId);
+  const root = buildBracketNode("final", byEventId);
+  const third = byEventId.get(THIRD_ID);
+  el.innerHTML = `
+    <div class="bkt-wrap">
+      <div class="bkt-headers">
+        <span>Round of 32</span><span>Round of 16</span><span>Quarters</span><span>Semis</span><span>Final</span>
+      </div>
+      <div class="bkt-tree">${bktNodeHTML(root)}</div>
+    </div>
+    <div class="bkt-third">
+      <h4 class="day-head">Third-Place Match</h4>
+      ${bktMatchCard(third)}
+    </div>`;
+}
+
 /* local YYYY-MM-DD key for splitting/sorting by calendar day */
 const dayKey = (d) => {
   const x = new Date(d);
@@ -503,6 +641,7 @@ function renderAll() {
   renderValue(cache.value);
   renderOwners(cache.ownerList);
   renderGroups(cache.groups);
+  renderBracket(cache.matches);
   renderScores(cache.matches);
   renderFixtures(cache.matches);
 }
@@ -537,7 +676,7 @@ async function refresh() {
 
 // tab switching (deep-linkable via #hash)
 function activateTab(name) {
-  const valid = ["leaderboard", "owners", "groups", "scores", "fixtures"];
+  const valid = ["leaderboard", "owners", "groups", "bracket", "scores", "fixtures"];
   if (!valid.includes(name)) name = "leaderboard";
   document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("active", x.dataset.tab === name));
   document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("active", s.id === name));
