@@ -323,9 +323,9 @@ function renderValue(value) {
     return `
       <li class="vp-row">
         <span class="team-name">
-          <span class="dot" style="background:${esc(OWNER_COLORS[o ? o.owner : ""])}" title="${o ? esc(OWNER_NAMES[o.owner]) : ""}"></span>
+          ${tag(t.code)}
           ${t.logo ? `<img class="team-logo" src="${safeUrl(t.logo)}" alt="">` : ""}
-          <b>${esc(t.name)}</b> <span class="team-code">${o ? esc(o.owner) : ""} · cost ${money(t.cost)}</span>
+          <b>${esc(t.name)}</b> <span class="team-code">cost ${money(t.cost)}</span>
         </span>
         <span class="vp-meta">
           <span class="vp-status">${esc(status)}</span>
