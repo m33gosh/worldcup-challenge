@@ -188,6 +188,78 @@ table.grp tr:last-child td { border-bottom: none; }
 }
 .owned { box-shadow: 0 0 0 2px var(--accent) inset; }
 
+/* ---- Bracket ---- */
+.bkt-wrap {
+  --col-w: 172px;          /* one round's horizontal step */
+  --bkt-gap: 24px;         /* connector gutter width */
+  --bkt-mw: calc(var(--col-w) - var(--bkt-gap)); /* match-card width */
+  --bkt-line: #2c4a66;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0 12px;
+  margin-top: 14px;
+}
+.bkt-inner { width: max-content; min-width: 100%; }
+.bkt-headers { display: flex; margin-bottom: 8px; }
+.bkt-headers span {
+  width: var(--col-w); flex: none;
+  font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--accent); font-weight: 700;
+}
+.bkt-headers span:last-child { width: var(--bkt-mw); }
+
+.bkt-tree { display: inline-flex; }
+.bkt-item { display: flex; align-items: center; }
+.bkt-item.leaf { width: var(--bkt-mw); }
+.bkt-children { display: flex; flex-direction: column; justify-content: center; }
+.bkt-branch { flex: 1; display: flex; align-items: center; position: relative; padding-right: var(--bkt-gap); }
+/* elbow: horizontal stub from each feeder out to the join line */
+.bkt-branch::after {
+  content: ""; position: absolute; right: 0; top: 50%;
+  width: var(--bkt-gap); height: 2px; background: var(--bkt-line);
+}
+/* elbow: vertical join — top feeder runs center→down, bottom feeder top→center; they meet at the parent's row */
+.bkt-branch::before { content: ""; position: absolute; right: 0; width: 2px; background: var(--bkt-line); }
+.bkt-branch.top::before { top: 50%; bottom: 0; }
+.bkt-branch.bot::before { top: 0; height: 50%; }
+.bkt-mid { display: flex; align-items: center; }
+
+.bkt-match {
+  width: var(--bkt-mw); flex: none;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 9px;
+  padding: 6px 8px; margin: 5px 0; font-size: .82rem;
+}
+.bkt-match.owned { box-shadow: 0 0 0 2px var(--accent) inset; }
+.bkt-match.live { border-color: var(--neg); }
+.bkt-match.empty { color: var(--muted); text-align: center; }
+.bkt-meta {
+  font-size: .6rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em;
+  margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.bkt-meta .live-badge { margin-right: 5px; }
+.bkt-side { display: flex; align-items: center; gap: 6px; padding: 2px 0; min-width: 0; }
+.bkt-side .bkt-team { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.bkt-side.tbd .bkt-team { color: var(--muted); font-style: italic; }
+.bkt-side.win .bkt-team { font-weight: 800; }
+.bkt-side.loss { opacity: .5; }
+.bkt-side .bkt-score { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 700; }
+.bkt-side .owner-chip { min-width: 22px; height: 17px; font-size: .6rem; padding: 0 5px; }
+
+.bkt-third { margin-top: 20px; max-width: 360px; }
+.bkt-third .bkt-match { width: 100%; }
+
+/* champion banner */
+.champion {
+  display: flex; align-items: center; gap: 14px;
+  background: linear-gradient(120deg, rgba(245,197,24,.18), rgba(0,160,240,.1));
+  border: 1px solid rgba(245,197,24,.5); border-radius: 12px;
+  padding: 12px 16px; margin-bottom: 14px;
+}
+.champion-crown { font-size: 2rem; line-height: 1; }
+.champion-text b { font-family: var(--font-display); font-size: 1.5rem; color: var(--gold); }
+.champion-owner { margin-left: auto; display: inline-flex; align-items: center; gap: 7px; font-weight: 700; }
+
 footer { text-align: center; color: var(--muted); font-size: .76rem; padding: 24px 16px 40px; }
 
 /* Quality floor */
@@ -218,7 +290,15 @@ footer { text-align: center; color: var(--muted); font-size: .76rem; padding: 24
   .vp-row .team-name { min-width: 0; }
   .team-name > b, .team-name { overflow-wrap: anywhere; }
 }
+@media (max-width: 560px) {
+  /* tighter rounds so more of the bracket fits before scrolling; still swipeable */
+  .bkt-wrap { --col-w: 138px; --bkt-gap: 18px; }
+  .bkt-match { font-size: .78rem; padding: 5px 7px; }
+  .champion-text b { font-size: 1.25rem; }
+  .champion-crown { font-size: 1.6rem; }
+}
 @media (max-width: 380px) {
   .team-code { font-size: .66rem; }
   .snm { font-size: 1.05rem; }
+  .bkt-wrap { --col-w: 126px; --bkt-gap: 16px; }
 }
