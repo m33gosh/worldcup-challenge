@@ -268,23 +268,40 @@ function computeValue(teams) {
 /* ====================== RENDER ====================== */
 const ownerColorFor = (code) => OWNER_COLORS[byCode[code] ? byCode[code].owner : ""] || "transparent";
 
+function renderHero(owners, phase) {
+  const el = document.getElementById("hero");
+  if (!el || !owners.length) return;
+  const leader = owners[0];
+  el.innerHTML = `
+    <div class="hero-stat"><span class="eyebrow">Prize pool</span><b>$800</b></div>
+    <div class="hero-stat"><span class="eyebrow">Managers</span><b>${owners.length}</b></div>
+    <div class="hero-stat"><span class="eyebrow">Stage</span><b>${esc(phase || "—")}</b></div>
+    <div class="hero-stat hero-leader"><span class="eyebrow">Leading</span>
+      <b><span class="dot" style="background:${esc(leader.color)}"></span>${esc(leader.name)}</b></div>`;
+}
+
 function renderLeaderboard(owners) {
-  const rows = owners.map((o, i) => `
-    <tr class="lead-row">
-      <td class="rank">${i + 1}</td>
-      <td><span class="owner-name"><span class="dot" style="background:${esc(o.color)}"></span>${esc(o.name)}</span></td>
-      <td class="money neg">-${money(o.cost).replace("-", "")}</td>
-      <td class="money ${o.earned > 0 ? "pos" : "muted"}">${money(o.earned)}</td>
-      <td class="money ${moneyClass(o.net)}">${money(o.net)}</td>
-    </tr>`).join("");
+  // break-even race: bars extend from a center zero line — left/red for down, right/green for up
+  const maxAbs = Math.max(1, ...owners.map((o) => Math.abs(o.net)));
+  const rows = owners.map((o, i) => {
+    const pct = Math.min(50, (Math.abs(o.net) / maxAbs) * 50);
+    const side = o.net < 0 ? "right:50%" : "left:50%";
+    const barCls = o.net > 0 ? "pos" : o.net < 0 ? "neg" : "zero";
+    return `
+      <div class="srow ${i === 0 ? "leader" : ""}">
+        <div class="srank">${i + 1}</div>
+        <div class="sname">
+          <span class="dot" style="background:${esc(o.color)}"></span>
+          <span class="snm">${esc(o.name)}</span>
+          <span class="ssub">paid ${money(o.cost)} · won ${money(o.earned)}</span>
+        </div>
+        <div class="strack" aria-hidden="true"><div class="sbar ${barCls}" style="${side};width:${pct}%"></div></div>
+        <div class="sfig ${moneyClass(o.net)}">${money(o.net)}</div>
+      </div>`;
+  }).join("");
   document.getElementById("leaderboard-body").innerHTML = `
-    <table class="lb">
-      <thead><tr>
-        <th class="rank">#</th><th>Person</th>
-        <th>Team Cost</th><th>Winnings</th><th>Standing</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+    <div class="standings-head"><span>Pos</span><span>Manager</span><span class="sh-track">Down ◄ break-even ► up</span><span>Standing</span></div>
+    <div class="standings">${rows}</div>`;
 }
 
 function renderValue(value) {
@@ -306,9 +323,9 @@ function renderValue(value) {
     return `
       <li class="vp-row">
         <span class="team-name">
-          <span class="dot" style="background:${esc(OWNER_COLORS[o ? o.owner : ""])}" title="${o ? esc(OWNER_NAMES[o.owner]) : ""}"></span>
+          ${tag(t.code)}
           ${t.logo ? `<img class="team-logo" src="${safeUrl(t.logo)}" alt="">` : ""}
-          <b>${esc(t.name)}</b> <span class="team-code">${o ? esc(o.owner) : ""} · cost ${money(t.cost)}</span>
+          <b>${esc(t.name)}</b> <span class="team-code">cost ${money(t.cost)}</span>
         </span>
         <span class="vp-meta">
           <span class="vp-status">${esc(status)}</span>
@@ -378,6 +395,7 @@ function renderOwners(owners) {
 
 function renderGroups(groups) {
   document.getElementById("groups-body").innerHTML = groups.map((g) => {
+    const letter = (g.name.match(/[A-Z]\s*$/i) || [g.name.slice(-1)])[0].trim();
     const rows = g.rows.map((t) => {
       const owner = byCode[t.code] ? byCode[t.code].owner : "";
       const qual = t.rank <= 2 ? "qual" : "";
@@ -389,7 +407,7 @@ function renderGroups(groups) {
     }).join("");
     return `
       <div class="group-card">
-        <h3>${esc(g.name)}</h3>
+        <div class="grp-head"><span class="grp-letter">${esc(letter)}</span><span class="eyebrow">Group</span></div>
         <table class="grp">
           <thead><tr><th>Team</th><th>P</th><th>W</th><th>D</th><th>L</th><th>GD</th><th>Pts</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -411,8 +429,9 @@ function matchCard(m) {
   const isOwned = (code) => !!byCode[code];
   const owned = isOwned(m.home.code) || isOwned(m.away.code) ? "owned" : "";
   const stateCls = m.state === "in" ? "live" : "";
+  const liveBadge = m.state === "in" ? `<span class="live-badge">LIVE</span> ` : "";
   const scoreTxt = m.state === "pre" ? "v" : `${esc(m.home.score ?? "")} – ${esc(m.away.score ?? "")}`;
-  const stateTxt = m.state === "pre" ? `${esc(fmtTime(m.date))} · ${esc(m.roundLabel)}` : `${esc(m.detail)} · ${esc(m.roundLabel)}`;
+  const stateTxt = m.state === "pre" ? `${esc(fmtTime(m.date))} · ${esc(m.roundLabel)}` : `${liveBadge}${esc(m.detail)} · ${esc(m.roundLabel)}`;
   const hc = m.completed ? (m.home.winner ? "win" : "loss") : "";
   const ac = m.completed ? (m.away.winner ? "win" : "loss") : "";
   return `
@@ -479,6 +498,7 @@ function tag(code) {
 let cache = null;
 function renderAll() {
   if (!cache) return;
+  renderHero(cache.ownerList, cache.phase);
   renderLeaderboard(cache.ownerList);
   renderValue(cache.value);
   renderOwners(cache.ownerList);
@@ -499,11 +519,11 @@ async function refresh() {
     const payouts = computePayouts(matches);
     const { teams, ownerList } = assemble(teamInfo, payouts);
     const value = computeValue(teams);
-    cache = { groups, teams, ownerList, matches, value };
-    renderAll();
-
     const phase = (scoreboard.leagues && scoreboard.leagues[0] && scoreboard.leagues[0].season &&
       scoreboard.leagues[0].season.type && scoreboard.leagues[0].season.type.name) || "World Cup";
+    cache = { groups, teams, ownerList, matches, value, phase };
+    renderAll();
+
     document.getElementById("phase-badge").textContent = phase;
     document.getElementById("updated").textContent =
       "Updated " + new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });

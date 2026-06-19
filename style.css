@@ -15,18 +15,28 @@
   --neg: #ff5c7a;         /* losses (pink-red) */
   --gold: #f5c518;        /* champion / advancing highlight */
   --shadow: 0 4px 16px rgba(0,0,0,.5);
+  /* Type system — athletic scoreboard: condensed display, mono figures, grotesque body */
+  --font-display: "Saira Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Saira", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   color: var(--text);
   line-height: 1.45;
   background: var(--bg);
   overflow-x: hidden; /* guard against any element forcing horizontal scroll on mobile */
   -webkit-tap-highlight-color: rgba(0,160,240,.15);
 }
+/* money / scores / records / odds — mechanical ledger figures */
+.money, .team-pay, .rec, .score, .owner-net, .vp-profit, .vp-delta, td.money,
+.race-fig, .hero-stat b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+/* display face for headings, ranks, group letters, eyebrows */
+h1, h3, h4, .day-head, table.lb th, table.grp th, .vp-card h4, .rank, .grp-letter, .eyebrow {
+  font-family: var(--font-display); }
 /* FIFA-style cyan/magenta glow as a fixed layer (background-attachment:fixed is janky on iOS Safari) */
 body::before {
   content: "";
@@ -61,20 +71,44 @@ main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; padding-left:
 .hidden { display: none; }
 .error { background: #3a1d1d; border: 1px solid #7f1d1d; color: #fecaca; padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; }
 
-/* Leaderboard */
-table.lb { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-table.lb th, table.lb td { padding: 12px 14px; text-align: right; border-bottom: 1px solid var(--border); }
-table.lb th { background: var(--panel-2); color: var(--muted); font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
-table.lb th:nth-child(2), table.lb td:nth-child(2) { text-align: left; }
-table.lb tr:last-child td { border-bottom: none; }
-.rank { color: var(--muted); width: 32px; text-align: center !important; }
-.owner-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 700; }
 .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; flex: none; }
 .money { font-variant-numeric: tabular-nums; font-weight: 600; }
 .pos { color: var(--pos); }
 .neg { color: var(--neg); }
 .muted { color: var(--muted); font-weight: 400; }
-.lead-row:hover { background: rgba(255,255,255,.02); }
+.eyebrow { display: block; font-size: .64rem; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* Hero strip — frames the stakes */
+.hero { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.hero-stat { flex: 1 1 auto; min-width: 120px; background: linear-gradient(150deg, var(--panel-2), var(--panel)); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); }
+.hero-stat b { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; line-height: 1.1; margin-top: 2px; letter-spacing: .01em; }
+.hero-leader { border-color: rgba(0,160,240,.45); }
+.hero-leader b { color: var(--accent); }
+
+/* Standings — the money race */
+.standings-head { display: grid; grid-template-columns: 40px 1fr minmax(120px, 2fr) auto; gap: 14px; align-items: end; padding: 0 16px 6px; }
+.standings-head span { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .08em; font-size: .64rem; color: var(--muted); }
+.standings-head span:nth-child(1) { text-align: center; }
+.standings-head span:last-child { text-align: right; }
+.sh-track { text-align: center; }
+.standings { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+.srow { display: grid; grid-template-columns: 40px 1fr minmax(120px, 2fr) auto; gap: 14px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); transition: background .15s; }
+.srow:last-child { border-bottom: none; }
+.srow:hover { background: rgba(255,255,255,.03); }
+.srow.leader { background: linear-gradient(90deg, rgba(0,160,240,.10), transparent 60%); }
+.srank { font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; color: var(--muted); text-align: center; }
+.srow.leader .srank { color: var(--accent); }
+.sname { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; min-width: 0; }
+.snm { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: .02em; }
+.sname .dot { align-self: center; }
+.ssub { flex-basis: 100%; font-family: var(--font-mono); font-size: .72rem; color: var(--muted); }
+.strack { position: relative; height: 22px; }
+.strack::before { content: ""; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 2px; background: var(--border); transform: translateX(-50%); } /* break-even line */
+.sbar { position: absolute; top: 4px; height: 14px; border-radius: 4px; min-width: 2px; }
+.sbar.neg { background: linear-gradient(90deg, transparent, rgba(255,92,122,.85)); }
+.sbar.pos { background: linear-gradient(90deg, rgba(46,227,122,.85), transparent); }
+.sbar.zero { background: var(--muted); }
+.sfig { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; font-size: 1.15rem; text-align: right; white-space: nowrap; }
 
 /* Steals & busts panel */
 #value-panel { margin-top: 18px; }
@@ -119,7 +153,9 @@ ul.team-list li:hover { background: rgba(255,255,255,.02); }
 /* Groups */
 .group-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 16px; }
 .group-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
-.group-card h3 { margin: 0; padding: 10px 14px; background: var(--panel-2); border-bottom: 1px solid var(--border); font-size: .95rem; }
+.grp-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--panel-2); border-bottom: 1px solid var(--border); }
+.grp-letter { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 9px; background: var(--bg); border: 1px solid var(--border); color: var(--accent); font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; line-height: 1; }
+.grp-head .eyebrow { letter-spacing: .16em; }
 table.grp { width: 100%; border-collapse: collapse; font-size: .85rem; }
 table.grp th, table.grp td { padding: 7px 10px; text-align: center; border-bottom: 1px solid var(--border); }
 table.grp th { color: var(--muted); font-size: .68rem; text-transform: uppercase; }
@@ -138,6 +174,9 @@ table.grp tr:last-child td { border-bottom: none; }
 .match .score { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 64px; text-align: center; }
 .match .state { font-size: .7rem; color: var(--muted); text-align: center; }
 .match .state.live { color: var(--neg); font-weight: 700; }
+.live-badge { display: inline-block; background: var(--neg); color: #2a0008; font-family: var(--font-display); font-weight: 700; font-size: .6rem; letter-spacing: .08em; padding: 1px 5px; border-radius: 4px; vertical-align: middle; animation: livePulse 1.6s ease-in-out infinite; }
+@keyframes livePulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .live-badge { animation: none; } }
 .win { font-weight: 700; }
 .loss { color: var(--muted); }
 .owner-chip {
@@ -151,15 +190,26 @@ table.grp tr:last-child td { border-bottom: none; }
 
 footer { text-align: center; color: var(--muted); font-size: .76rem; padding: 24px 16px 40px; }
 
+/* Quality floor */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  .tab.active { animation: none; }
+  * { transition: none !important; }
+}
+
+@media (max-width: 620px) {
+  /* drop the race track on phones; keep rank, manager, and the headline figure */
+  .standings-head, .srow { grid-template-columns: 34px 1fr auto; }
+  .standings-head .sh-track, .srow .strack { display: none; }
+}
 @media (max-width: 560px) {
-  /* keep #, Person, Cost, and Standing (the headline net); drop Winnings (col 4, $0 until knockouts) */
-  table.lb th:nth-child(4), table.lb td:nth-child(4) { display: none; }
-  table.lb th, table.lb td { padding: 11px 10px; }
   h1 { font-size: 1.1rem; }
   .header-inner { padding-top: 10px; padding-bottom: 10px; gap: 8px; }
   nav#tabs button { padding: 10px 12px; font-size: .88rem; }
   main { padding-top: 14px; }
   .section-note { font-size: .82rem; }
+  .hero-stat { min-width: calc(50% - 5px); padding: 10px 12px; }
+  .hero-stat b { font-size: 1.35rem; }
   .match { gap: 8px; padding: 9px 11px; }
   .match .side { gap: 6px; }
   .owner-chip { min-width: 24px; height: 18px; font-size: .63rem; }
@@ -169,6 +219,6 @@ footer { text-align: center; color: var(--muted); font-size: .76rem; padding: 24
   .team-name > b, .team-name { overflow-wrap: anywhere; }
 }
 @media (max-width: 380px) {
-  table.lb th, table.lb td { padding: 10px 7px; font-size: .92rem; }
   .team-code { font-size: .66rem; }
+  .snm { font-size: 1.05rem; }
 }
