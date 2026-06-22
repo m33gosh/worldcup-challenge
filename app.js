@@ -101,6 +101,7 @@ function parseEvents(scoreboard) {
     const home = comp.competitors.find((c) => c.homeAway === "home");
     const away = comp.competitors.find((c) => c.homeAway === "away");
     const st = ev.status.type;
+    const goals = parseGoals(comp);
     matches.push({
       id: ev.id,
       date: ev.date,
@@ -109,12 +110,41 @@ function parseEvents(scoreboard) {
       completed: !!st.completed,
       state: st.state, // pre | in | post
       detail: st.shortDetail,
-      home: side(home),
-      away: side(away),
+      home: { ...side(home), goals: goals.home.goals, reds: goals.home.reds },
+      away: { ...side(away), goals: goals.away.goals, reds: goals.away.reds },
     });
   }
   matches.sort((a, b) => new Date(a.date) - new Date(b.date));
   return matches;
+}
+/* goals and red cards from a competition's `details`, split by side.
+ * Goals: ESPN attributes `team` to the SCORING side — including own goals
+ * (detail.team is the benefiting team, not the player's), so we map straight off it.
+ * Red cards: attributed to the carded player's own team. */
+function parseGoals(comp) {
+  const sideOf = Object.create(null); // team.id -> "home"/"away"
+  for (const c of comp.competitors || []) sideOf[c.team.id] = c.homeAway;
+  const out = { home: { goals: [], reds: [] }, away: { goals: [], reds: [] } };
+  for (const det of comp.details || []) {
+    const which = sideOf[det.team && det.team.id];
+    if (which !== "home" && which !== "away") continue;
+    const ath = (det.athletesInvolved || [])[0];
+    const minute = (det.clock && det.clock.displayValue) || "";
+    const sort = det.clock && typeof det.clock.value === "number" ? det.clock.value : 0;
+    if (det.scoringPlay) {
+      out[which].goals.push({
+        name: ath ? (ath.shortName || ath.displayName) : "Goal",
+        minute, sort, og: !!det.ownGoal, pen: !!det.penaltyKick,
+      });
+    } else if (det.redCard) {
+      out[which].reds.push({ name: ath ? (ath.shortName || ath.displayName) : "Red card", minute, sort });
+    }
+  }
+  for (const w of ["home", "away"]) {
+    out[w].goals.sort((a, b) => a.sort - b.sort);
+    out[w].reds.sort((a, b) => a.sort - b.sort);
+  }
+  return out;
 }
 function side(c) {
   if (!c) return { code: "?", name: "TBD", score: null, winner: false, logo: null };
@@ -563,6 +593,29 @@ const todayKey = () => dayKey(new Date());
 const fmtDay = (iso) => new Date(iso).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+/* one side's scorers, grouping a player's multiple goals: "Quiñones 9', 67' (P)" */
+function goalsList(goals) {
+  const order = [];
+  const byName = new Map();
+  for (const g of goals) {
+    if (!byName.has(g.name)) { byName.set(g.name, []); order.push(g.name); }
+    byName.get(g.name).push(g);
+  }
+  return order.map((name) => {
+    const mins = byName.get(name)
+      .map((g) => esc(g.minute) + (g.pen ? " (P)" : "") + (g.og ? " (OG)" : ""))
+      .join(", ");
+    return `<span class="goal"><span class="g-name">${esc(name)}</span> <span class="g-min">${mins}</span></span>`;
+  }).join("");
+}
+
+/* one side's red cards: "🟥 Sithole 49'" */
+function redsList(reds) {
+  return (reds || []).map((r) =>
+    `<span class="redcard"><span class="rc-ico" aria-hidden="true">🟥</span><span class="g-name">${esc(r.name)}</span> <span class="g-min">${esc(r.minute)}</span></span>`
+  ).join("");
+}
+
 function matchCard(m) {
   const isOwned = (code) => !!byCode[code];
   const owned = isOwned(m.home.code) || isOwned(m.away.code) ? "owned" : "";
@@ -572,6 +625,15 @@ function matchCard(m) {
   const stateTxt = m.state === "pre" ? `${esc(fmtTime(m.date))} · ${esc(m.roundLabel)}` : `${liveBadge}${esc(m.detail)} · ${esc(m.roundLabel)}`;
   const hc = m.completed ? (m.home.winner ? "win" : "loss") : "";
   const ac = m.completed ? (m.away.winner ? "win" : "loss") : "";
+  const hg = m.home.goals || [], ag = m.away.goals || [];
+  const hr = m.home.reds || [], ar = m.away.reds || [];
+  const scorers = (hg.length || ag.length || hr.length || ar.length)
+    ? `<div class="scorers">
+        <div class="sc-side">${goalsList(hg)}${redsList(hr)}${(hg.length || hr.length) ? "" : '<span class="g-none">—</span>'}</div>
+        <span class="sc-ball" aria-hidden="true">⚽</span>
+        <div class="sc-side away">${goalsList(ag)}${redsList(ar)}${(ag.length || ar.length) ? "" : '<span class="g-none">—</span>'}</div>
+      </div>`
+    : "";
   return `
     <div class="match ${owned}">
       <div class="side home ${hc}">
@@ -586,6 +648,7 @@ function matchCard(m) {
         <span>${esc(m.away.name)}</span>
         ${m.away.logo ? `<img class="team-logo" src="${safeUrl(m.away.logo)}" alt="">` : ""} ${tag(m.away.code)}
       </div>
+      ${scorers}
     </div>`;
 }
 

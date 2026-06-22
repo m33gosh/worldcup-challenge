@@ -188,6 +188,19 @@ table.grp tr:last-child td { border-bottom: none; }
 }
 .owned { box-shadow: 0 0 0 2px var(--accent) inset; }
 
+/* ---- Goalscorers (Scores tab) ---- */
+.match .scorers { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto 1fr; gap: 3px 12px; align-items: start; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); font-size: .74rem; }
+.scorers .sc-side { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.scorers .sc-side.away { align-items: flex-end; text-align: right; }
+.scorers .sc-ball { align-self: center; color: var(--muted); font-size: .8rem; }
+.scorers .goal, .scorers .redcard { overflow-wrap: anywhere; }
+.scorers .redcard { display: inline-flex; align-items: baseline; gap: 4px; }
+.scorers .sc-side.away .redcard { flex-direction: row-reverse; }
+.scorers .rc-ico { font-size: .62rem; line-height: 1; }
+.scorers .g-name { color: var(--text); }
+.scorers .g-min { color: var(--muted); font-variant-numeric: tabular-nums; }
+.scorers .g-none { color: var(--muted); }
+
 /* ---- Bracket ---- */
 .bkt-wrap {
   --col-w: 172px;          /* one round's horizontal step */
