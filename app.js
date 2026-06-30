@@ -479,10 +479,13 @@ const KO_TREE = {
   r16_6: { id: "760507", feeders: ["r32_9", "r32_10"] },
   r16_7: { id: "760508", feeders: ["r32_13", "r32_15"] },
   r16_8: { id: "760509", feeders: ["r32_14", "r32_16"] },
-  r32_1: { id: "760486" }, r32_2: { id: "760487" }, r32_3: { id: "760489" }, r32_4: { id: "760488" },
-  r32_5: { id: "760490" }, r32_6: { id: "760492" }, r32_7: { id: "760491" }, r32_8: { id: "760495" },
-  r32_9: { id: "760493" }, r32_10: { id: "760494" }, r32_11: { id: "760497" }, r32_12: { id: "760496" },
-  r32_13: { id: "760498" }, r32_14: { id: "760499" }, r32_15: { id: "760500" }, r32_16: { id: "760501" },
+  // R32 leaf key r32_N = ESPN's "Round of 32 Match N" — i.e. the Nth R32 fixture by FIFA
+  // matchNumber (73..88), which the R16 "Round of 32 N Winner" placeholders point back to.
+  // This is NOT event-id order, so it's mapped explicitly from the live matchNumber field.
+  r32_1: { id: "760486" }, r32_2: { id: "760489" }, r32_3: { id: "760488" }, r32_4: { id: "760487" },
+  r32_5: { id: "760492" }, r32_6: { id: "760490" }, r32_7: { id: "760491" }, r32_8: { id: "760495" },
+  r32_9: { id: "760494" }, r32_10: { id: "760493" }, r32_11: { id: "760496" }, r32_12: { id: "760497" },
+  r32_13: { id: "760498" }, r32_14: { id: "760500" }, r32_15: { id: "760501" }, r32_16: { id: "760499" },
 };
 const THIRD_ID = "760516"; // 3rd-place match, shown on its own (not part of the tree)
 
