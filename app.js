@@ -264,13 +264,42 @@ const round2 = (n) => Math.round(n * 100) / 100;
  * surprise = expectedRank - actualRank. Positive = overachieving for its price.
  */
 const ROUND_PROGRESS = { group: 0, r32: 1, r16: 2, qf: 3, sf: 4, third: 5, final: 6 };
-function perfScore(t) {
-  // knockout progress dominates; group form (pts, goal diff, goals) breaks ties
-  return (ROUND_PROGRESS[t.roundReached] || 0) * 100000 + (t.pts || 0) * 1000 + (t.gd || 0) * 10 + (t.gf || 0);
+
+/* Knockout status per roster team, read from the actual fixtures. A team "appears"
+ * in a round as soon as it's a resolved competitor there — so a group winner shows
+ * up in its Round-of-32 fixture before that match is even played. That lets us treat
+ * every still-alive team as one tier no matter when its next match is scheduled,
+ * instead of penalizing whoever happens to kick off a day later. */
+function koStatus(matches) {
+  const st = Object.create(null); // code -> { stage, lostKO }
+  for (const m of matches) {
+    if (m.round === "group" || m.round === "other") continue;
+    for (const s of [m.home, m.away]) {
+      if (!s || !byCode[s.code]) continue;
+      const cur = st[s.code] || { stage: m.round, lostKO: false };
+      if ((ROUND_ORDER[m.round] || 0) >= (ROUND_ORDER[cur.stage] || 0)) cur.stage = m.round;
+      if (m.completed && !s.winner) cur.lostKO = true; // a completed loss = eliminated
+      st[s.code] = cur;
+    }
+  }
+  return st;
 }
-function computeValue(teams) {
-  const list = teams.filter((t) => t.gp > 0 || t.roundReached !== "group"); // teams that have played
+const isAlive = (koStat, code) => !!koStat[code] && !koStat[code].lostKO;
+
+function computeValue(teams, koStat) {
+  const list = teams.filter((t) => t.gp > 0 || koStat[t.code]); // teams that have played or reached the knockouts
   if (!list.length) return { steals: [], busts: [], mode: "form" };
+
+  // Actual-performance score. Every still-alive team shares one top tier ranked by
+  // group form, so a strong record stays near the top until the team is actually
+  // knocked out — even if its next fixture hasn't kicked off yet. Eliminated teams
+  // rank below by how far they got. (form = points, then goal diff, then goals.)
+  const perfScore = (t) => {
+    const form = (t.pts || 0) * 1000 + (t.gd || 0) * 10 + (t.gf || 0);
+    if (isAlive(koStat, t.code)) return 10000000 + form;
+    const reached = koStat[t.code] ? koStat[t.code].stage : "group";
+    return (ROUND_PROGRESS[reached] || 0) * 100000 + form;
+  };
 
   const byPerf = [...list].sort((a, b) => perfScore(b) - perfScore(a));
   const byCost = [...list].sort((a, b) => b.cost - a.cost);
@@ -723,7 +752,7 @@ async function refresh() {
     const matches = parseEvents(scoreboard);
     const payouts = computePayouts(matches);
     const { teams, ownerList } = assemble(teamInfo, payouts);
-    const value = computeValue(teams);
+    const value = computeValue(teams, koStatus(matches));
     const phase = (scoreboard.leagues && scoreboard.leagues[0] && scoreboard.leagues[0].season &&
       scoreboard.leagues[0].season.type && scoreboard.leagues[0].season.type.name) || "World Cup";
     cache = { groups, teams, ownerList, matches, value, phase };
